@@ -17,15 +17,32 @@ const pluginId = "sailsconfiguration";
 const debug = require("debug")(pluginId);
 
 module.exports = function(app) {
-  var plugin = {};
+  let plugin = {};
+  let timer;
 
   plugin.start = function(props) {
     debug("starting");
+    timer = setInterval(_ => {
+      const values = (props.sails || []).map(sail => {
+        return {
+          path: "sails." + sail.id,
+          value: sail.state > 0 ? sail.state : null
+        };
+      });
+      app.handleMessage(pluginId, {
+        updates: [
+          {
+            values: values
+          }
+        ]
+      });
+    }, props.deltaInterval * 1000);
     debug("started");
   };
 
   plugin.stop = function() {
     debug("stopping");
+    timer && clearTimeout(timer);
     debug("stopped");
   };
 
@@ -36,7 +53,12 @@ module.exports = function(app) {
 
   plugin.schema = {
     type: "object",
+    required: ["deltaInterval"],
     properties: {
+      deltaInterval: {
+        type: "number",
+        default: 60
+      },
       sails: {
         type: "array",
         items: {
