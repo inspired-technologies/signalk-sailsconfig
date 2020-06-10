@@ -1,5 +1,5 @@
 {
-  "name": "sailsconfiguration",
+  "name": "@signalk/sailsconfiguration",
   "version": "0.0.1",
   "description": "Signal K Sailsconfiguration plugin",
   "main": "index.js",
