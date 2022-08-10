@@ -1,5 +1,5 @@
 /*
-    Copyright © 2021 Inspired Technologies GmbH (www.inspiredtechnologies.eu)
+    Copyright © 2022 Inspired Technologies GmbH (www.inspiredtechnologies.eu)
     forked from @signalk/sailsconfiguration by 2017 Teppo Kurki <teppo.kurki@iki.fi>
     License granted under the Apache License, Version 2.0 (the "License")
  
@@ -16,6 +16,7 @@
 
 const pluginId = "signalk-sailsconfig";
 const debug = require("debug")(pluginId);
+const { v1: uuidv1 } = require('uuid');
 
 module.exports = function(app) {
   let plugin = {};
@@ -26,8 +27,14 @@ module.exports = function(app) {
     timer = setInterval(_ => {
       const values = (props.sails || []).map(sail => {
         return {
-          path: "sails." + sail.id,
-          value: sail.state > 0 ? sail.state : null
+          path: "sails." + sail.label,
+          value: sail.state && sail.state > 0 ? 
+           {
+              reduced: sail.states[sail.state-1].value!=0,
+              reefs: sail.state-1,
+              furledRatio: sail.states[sail.state-1].value
+           }
+          : null
         };
       });
       app.handleMessage(pluginId, {
@@ -68,16 +75,16 @@ module.exports = function(app) {
           properties: {
             id: {
               type: "string",
-              title: "Id"
+              title: "Id",
+              default: uuidv1({msecs: Date.now()})
+            },
+            label: {
+              type: "string",
+              title: "Label",
             },
             name: {
               type: "string",
-              title: "Name or Label",
-              description: "An unique identifier by which the crew identifies a sail"
-            },
-            name: {
-              type: "bool",
-              title: "Name or Label",
+              title: "Name",
               description: "An unique identifier by which the crew identifies a sail"
             },
             material: {
@@ -92,6 +99,7 @@ module.exports = function(app) {
             },
             type: {
               type: "string",
+              title: "Type",
               enum: ["main", "jib", "genoa", "staysail", "spinnaker", "genakker", "code0", "blister", "parasailor", "other"],
               description: "The type of sail" 
             },
@@ -119,7 +127,8 @@ module.exports = function(app) {
             state: {
               type: "number",
               title: "State",
-              description: "Indicates wether this sail is currently in use or not, null value means inactive"
+              description: "Indicates wether this sail is currently in use or not, null value means inactive",
+              default: 0
             },
             states: {
               type: "array",
