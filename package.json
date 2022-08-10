@@ -1,20 +1,29 @@
 {
-  "name": "@signalk/sailsconfiguration",
-  "version": "1.1.0",
-  "description": "Signal K plugin for setting the vessel's sail inventory and configuration",
+  "name": "signalk-sailsconfig",
+  "version": "0.9.0",
+  "description": "SignalK Sails Configuration (plugin & api)",
   "main": "index.js",
   "scripts": {
     "build": "js-yaml openapi.yaml > openapi.json",
     "prepublishOnly": "npm run build",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "debug": "node --inspect-brk=192.168.0.97:9229 /usr/local/lib/node_modules/signalk-server/bin/signalk-server -c /home/pi/signalk"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/inspired-technologies/signalk-sailsconfig.git"
   },
   "keywords": [
     "signalk-node-server-plugin",
     "signalk-category-utility",
     "signalk-webapp"
   ],
-  "author": "teppo.kurki@iki.fi",
-  "license": "ISC",
+  "author": "Inspired Technologies",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/inspired-technologies/signalk-sailsconfig/issues"
+  },
+  "homepage": "https://github.com/inspired-technologies/signalk-sailsconfig#readme",
   "devDependencies": {
     "js-yaml": "^4.1.0"
   }
