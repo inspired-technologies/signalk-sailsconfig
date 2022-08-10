@@ -1,19 +1,20 @@
 /*
- * Copyright 2017 Teppo Kurki <teppo.kurki@iki.fi>
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+    Copyright © 2021 Inspired Technologies GmbH (www.inspiredtechnologies.eu)
+    forked from @signalk/sailsconfiguration by 2017 Teppo Kurki <teppo.kurki@iki.fi>
+    License granted under the Apache License, Version 2.0 (the "License")
+ 
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
 
-const pluginId = "sailsconfiguration";
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+*/
+
+const pluginId = "signalk-sailsconfig";
 const debug = require("debug")(pluginId);
 
 module.exports = function(app) {
@@ -49,7 +50,7 @@ module.exports = function(app) {
   plugin.id = pluginId;
   plugin.name = "Sails Configuration";
   plugin.description =
-    "Plugin that allows you to define your server's sails inventory and configuration";
+    "Plugin to define your server's sails inventory and configuration";
 
   plugin.schema = {
     type: "object",
@@ -71,23 +72,54 @@ module.exports = function(app) {
             },
             name: {
               type: "string",
-              title: "Name"
+              title: "Name or Label",
+              description: "An unique identifier by which the crew identifies a sail"
             },
-            description: {
+            name: {
+              type: "bool",
+              title: "Name or Label",
+              description: "An unique identifier by which the crew identifies a sail"
+            },
+            material: {
               type: "string",
-              title: "Description"
+              title: "Material",
+              description: "[Optional] The material the sail is made from"
+            },
+            brand: {
+              type: "string",
+              title: "Brand",
+              description: "[Optional] The brand, make or manufacturer of the sail"
             },
             type: {
               type: "string",
-              enum: ["main", "gyb", "spinnaker", "codezero"]
+              enum: ["main", "jib", "genoa", "staysail", "spinnaker", "genakker", "code0", "blister", "parasailor", "other"],
+              description: "The type of sail" 
             },
             area: {
               type: "number",
-              title: "Area"
+              title: "Area",
+              description: "The total area of this sail in square meters, units: m2 (square meter)"
+            },
+            wind: {
+              type: "object",
+              title: "Usage",
+              properties: {
+                min: {
+                  type: "number",
+                  title: "Minimum",
+                  description: "The minimum wind speed this sail can be used with, units: m/s (meters per second)"
+                },
+                max: {
+                  type: "number",
+                  title: "Maximum",
+                  description: "The maximum wind speed this sail can be used with, units: m/s (meters per second)"
+                },
+              }
             },
             state: {
               type: "number",
-              title: "State"
+              title: "State",
+              description: "Indicates wether this sail is currently in use or not, null value means inactive"
             },
             states: {
               type: "array",
@@ -96,7 +128,8 @@ module.exports = function(app) {
                 properties: {
                   name: {
                     type: "string",
-                    title: "State name"
+                    title: "State or Reef name",
+                    description: "Indicates number of reefs set, 0 means full"
                   },
                   value: {
                     type: "number",

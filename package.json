@@ -1,17 +1,32 @@
 {
-  "name": "@signalk/sailsconfiguration",
-  "version": "0.0.1",
-  "description": "Signal K Sailsconfiguration plugin",
+  "name": "signalk-sailsconfig",
+  "version": "0.0.9",
+  "description": "SignalK Sails Configuration (plugin & api)",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "debug": "node --inspect-brk=192.168.0.98:9229 /usr/local/lib/node_modules/signalk-server/bin/signalk-server",
+    "deploy": "npm test && git tag -a v$npm_package_version -m 'Release v$npm_package_version'; git push --tags; npm publish --access public ."
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/inspired-technologies/signalk-sailsconfig.git"
   },
   "keywords": [
-    "signalk-node-server-plugin"
+    "signalk",
+    "signalk-node-server-plugin",
+    "signalk-category-utility"
   ],
-  "author": "teppo.kurki@iki.fi",
-  "license": "ISC",
+  "author": "Inspired Technologies",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/inspired-technologies/signalk-sailsconfig/issues"
+  },
+  "homepage": "https://github.com/inspired-technologies/signalk-sailsconfig#readme",
   "dependencies": {
-    "debug": "^4.0.0"
+    "debug": "^4.3.4"
+  },
+  "devDependencies": {
+    "@signalk/github-create-release": "^1.2.1"
   }
 }
