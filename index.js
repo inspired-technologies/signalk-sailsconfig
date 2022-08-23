@@ -17,35 +17,44 @@
 const pluginId = "signalk-sailsconfig";
 const debug = require("debug")(pluginId);
 const { v1: uuidv1 } = require('uuid');
+const sails = require('./sails')
 
 module.exports = function(app) {
   let plugin = {};
   let timer;
+  let registered = false;
 
   plugin.start = function(props) {
     debug("starting");
+    app.setPluginStatus("starting");
+
+    if (sails.init(props.sails, pluginId, props.putToken, log))
+    {
+      registered = sails.register(app.registerPutHandler, props.sails, { read: app.getSelfPath, publish: sendDelta }, { delta: sendDelta, meta: sendMeta}, app.setPluginStatus)
+    }
+    else
+      app.setPluginError('Error initializing plugin');
+
+
     timer = setInterval(_ => {
-      const values = (props.sails || []).map(sail => {
+      const values = registered ? sails.config(sails.list(true)) : 
+      (props.sails || []).map(sail => {
         return {
           path: "sails." + sail.label,
           value: sail.state && sail.state > 0 ? 
            {
               reduced: sail.states[sail.state-1].value!=0,
               reefs: sail.state-1,
-              furledRatio: sail.states[sail.state-1].value
+              furledRatio: 1-sail.states[sail.state-1].value
            }
           : null
         };
       });
-      app.handleMessage(pluginId, {
-        updates: [
-          {
-            values: values
-          }
-        ]
-      });
+      sendDelta(values);
     }, props.deltaInterval * 1000);
+
     debug("started");
+    app.setPluginStatus("started");
   };
 
   plugin.stop = function() {
@@ -54,6 +63,18 @@ module.exports = function(app) {
     debug("stopped");
   };
 
+  plugin.signalKApiRoutes = function (router) {
+    router.get('/vessels/self/sails/inventory', sails.inventory)
+    router.get('/vessels/' + app.selfId + '/sails/inventory', sails.inventory)
+    sails.list().forEach(sail =>
+    {
+      router.get('/vessels/self/sails/inventory/'+sail, sails.spec)
+      router.get('/vessels/' + app.selfId + '/sails/inventory/'+sail, sails.spec)  
+    })
+    app.debug("'inventory' endpoint registered");
+    return router
+  }
+
   plugin.id = pluginId;
   plugin.name = "Sails Configuration";
   plugin.description =
@@ -61,11 +82,15 @@ module.exports = function(app) {
 
   plugin.schema = {
     type: "object",
-    required: ["deltaInterval"],
+    required: ["deltaInterval", "putToken"],
     properties: {
       deltaInterval: {
         type: "number",
         default: 60
+      },
+      putToken: {
+        type: "string",
+        default: "SailsConfig/1.0.0"
       },
       sails: {
         type: "array",
@@ -142,7 +167,9 @@ module.exports = function(app) {
                   },
                   value: {
                     type: "number",
-                    title: "Corresponding fraction of sail open 0..1"
+                    title: "Corresponding fraction of sail open 0..1",
+                    description: "Ratio of sail out, 1 means full and 0 is completely furled in",
+                    default: 1
                   }
                 }
               }
@@ -152,6 +179,32 @@ module.exports = function(app) {
       }
     }
   };
+
+    /**
+   * 
+   * @param {Array<[{path:path, value:value}]>} values 
+   */
+     function sendDelta(values) {
+      app.handleMessage(pluginId, {
+          updates: [
+              {
+                  values: values
+              }
+          ]
+      });
+  }
+
+  function sendMeta(units) {
+      app.handleMessage(pluginId, {
+          updates: [
+              {
+                  meta: units
+              }
+          ]   
+      })
+  }
+
+  function log(msg) { app.debug(msg); }
 
   return plugin;
 };
