@@ -82,7 +82,7 @@ module.exports = function(app) {
     timer = setInterval(setDeltas, props.deltaInterval * 1000);
     setDeltas();
     debug("started");
-    app.setPluginStatus("started");
+    app.setPluginStatus("Started");
   };
 
   plugin.stop = function() {
