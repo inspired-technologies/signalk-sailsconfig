@@ -54,7 +54,7 @@ module.exports = function(app) {
     }, props.deltaInterval * 1000);
 
     debug("started");
-    app.setPluginStatus("started");
+    app.setPluginStatus("Started");
   };
 
   plugin.stop = function() {

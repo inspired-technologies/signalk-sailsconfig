@@ -1,6 +1,6 @@
 {
   "name": "signalk-sailsconfig",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "SignalK Sails Configuration (plugin & api)",
   "main": "index.js",
   "scripts": {
