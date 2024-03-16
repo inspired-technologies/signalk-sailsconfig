@@ -14,6 +14,7 @@
 let APPTOKEN
 const APITOKEN = 'SignalKApi/v1' // TODO: needed?
 let PLUGINID
+let IDs = []
 let Sails = []
 let States = []
 let Specification = []
@@ -37,6 +38,7 @@ const init = (config, pluginid, token, loghandler) => {
     log = loghandler
     // Sails & States derived from config
     config.forEach(sail => {
+        IDs[sail.label] = sail.id
         Sails[sail.label] = sail.state && sail.state > 0 ? 
         {
            reduced: sail.states[sail.state-1].value!=1,
@@ -269,7 +271,24 @@ function config (active) {
 function inventory (req, res, next) {
     let results = []
     Inventory.forEach(sail => {
-        let result = Specification[sail.label]
+        let result = {}
+        if (req.query.hasOwnProperty("mode") && req.query.mode=="export")
+        {
+            result.id = IDs[sail.label]
+            result.label = sail.label
+            result.states = []
+            for (i=0; i<States[sail.label].length; i++)
+                result.states.push({
+                    "units": i,
+                    "value": -1*States[sail.label][States[sail.label][i]].furledRatio+1
+                })
+        }
+        result.name = Specification[sail.label].name,
+        result.type = Specification[sail.label].type,
+        result.material = Specification[sail.label].material,
+        result.brand = Specification[sail.label].brand,
+        result.area = Specification[sail.label].area,
+        result.wind = Specification[sail.label].wind        
         if (result)
         {
             result.active = sail.active
