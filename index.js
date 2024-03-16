@@ -1,5 +1,5 @@
 /*
-    Copyright © 2022 Inspired Technologies GmbH (www.inspiredtechnologies.eu)
+    Copyright © 2024 Inspired Technologies GmbH (www.inspiredtechnologies.eu)
     forked from @signalk/sailsconfiguration by 2017 Teppo Kurki <teppo.kurki@iki.fi>
     License granted under the Apache License, Version 2.0 (the "License")
  
