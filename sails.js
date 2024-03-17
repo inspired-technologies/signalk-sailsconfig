@@ -1,5 +1,5 @@
 /*
-    Copyright © 2022 Inspired Technologies
+    Copyright © 2024 Inspired Technologies
 
     Permission is hereby granted, free of charge, to any person obtaining a copy
     of this software and associated documentation files (the "Software"), to deal
@@ -14,6 +14,7 @@
 let APPTOKEN
 const APITOKEN = 'SignalKApi/v1' // TODO: needed?
 let PLUGINID
+let refreshRate
 let IDs = []
 let Sails = []
 let States = []
@@ -32,10 +33,11 @@ const sailAreaTotal = pathPrefix + "area.total"
 const sailAreaActive = pathPrefix + "area.active"
 // const navigationState = 'navigation.state'
 
-const init = (config, pluginid, token, loghandler) => {
+const init = (config, pluginid, token, refresh, loghandler) => {
     PLUGINID = pluginid
     APPTOKEN = token
     log = loghandler
+    refreshRate = refresh ? refresh>0 ? refresh : undefined : undefined 
     // Sails & States derived from config
     config.forEach(sail => {
         IDs[sail.label] = sail.id
@@ -90,6 +92,13 @@ function register (subscribe, sails, get, send, status) {
             { path: pathPrefix+sail.label, source: APPTOKEN, type: 'state', description: `Current sail configuration of ${sail.label} sail`  }
         )
     })
+
+    updateVal[sailAreaTotal] = { updated: new Date(Date.now()).toISOString(), value: null, refresh: refreshRate }
+    metas.push(buildDeltaUpdate(sailAreaTotal, { units: 'm2', timeout: refreshRate, description: 'The total area of all sails on the vessel' }))
+    updateVal[sailAreaActive] = { updated: new Date(Date.now()).toISOString(), value: null, refresh: refreshRate}
+    metas.push(buildDeltaUpdate(sailAreaTotal, { units: 'm2', timeout: refreshRate, description: 'The total area of the sails currently in use on the vessel' }))
+    updateVal[sailArea] = { updated: new Date(Date.now()).toISOString(), value: null, refresh: refreshRate }
+    metas.push(buildDeltaUpdate(sailAreaTotal, { units: 'm2', timeout: refreshRate, description: "An object containing information about the vessels' sails" }))
 
     if (putHandlers.length>0)
     {
@@ -179,16 +188,14 @@ function handlePutCall (context, path, value, callback) {
         log(`${handler}: couldn't update '${path}', error: ${errMsg}`)
     }
   
-    if (context === 'vessels.self') {
-        // let currentVal = getVal(path)
+    if (!error && context === 'vessels.self') {
         if (value===null)
         {
             updateVal[path].updated = new Date(Date.now()).toISOString()
             updateVal[path].value = null
             update.push(buildDeltaUpdate(path, updateVal[path].value))
             Inventory[index].active = false
-        }
-        else if (value===undefined || !(value.hasOwnProperty('reefs') || value.hasOwnProperty('furledRatio') || value.hasOwnProperty('state'))) {
+        } else if (value===undefined || !(value.hasOwnProperty('reefs') || value.hasOwnProperty('furledRatio') || value.hasOwnProperty('state'))) {
             error = true; 
             errMsg = `Type mismatch: '${typeof value}' doesn't match '${updateVal[path].type}'`
             log(`${handler}: couldn't update '${path}', error: ${errMsg}`)
@@ -236,6 +243,16 @@ function handlePutCall (context, path, value, callback) {
             Inventory[index].active = true
             update.push(buildDeltaUpdate(path, updateVal[path].value))
         }
+        // update area values
+        updateVal[sailAreaTotal].updated = new Date(Date.now()).toISOString()
+        updateVal[sailAreaTotal].value = Inventory.map(s => Specification[s.label].area.value).reduce((sum, a) => sum+a, 0);
+        update.push(buildDeltaUpdate(sailAreaTotal, updateVal[sailAreaTotal].value))
+        updateVal[sailAreaActive].updated = new Date(Date.now()).toISOString()
+        updateVal[sailAreaActive].value = Inventory.map(s => s.active ? Specification[s.label].area.value : 0).reduce((sum, a) => sum+a, 0);
+        update.push(buildDeltaUpdate(sailAreaActive, updateVal[sailAreaActive].value))
+        updateVal[sailArea].updated = new Date(Date.now()).toISOString()
+        updateVal[sailArea].value = { "count": Inventory.length, "total": updateVal[sailAreaTotal].value, "active": updateVal[sailAreaActive].value }
+        update.push(buildDeltaUpdate(sailArea, updateVal[sailArea].value))
     }
 
     if (!error && update.length>0) 

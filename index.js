@@ -28,7 +28,7 @@ module.exports = function(app) {
     debug("starting");
     app.setPluginStatus("starting");
 
-    if (sails.init(props.sails, pluginId, props.putToken, log))
+    if (sails.init(props.sails, pluginId, props.putToken, props.deltaInterval, log))
     {
       registered = sails.register(app.registerPutHandler, props.sails, { read: app.getSelfPath, publish: sendDelta }, { delta: sendDelta, meta: sendMeta}, app.setPluginStatus)
     }
