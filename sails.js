@@ -96,7 +96,7 @@ function register (subscribe, sails, get, send, status) {
     updateVal[sailAreaTotal] = { updated: new Date(Date.now()).toISOString(), value: null, refresh: refreshRate }
     metas.push(buildDeltaUpdate(sailAreaTotal, { units: 'm2', timeout: refreshRate, description: 'The total area of all sails on the vessel' }))
     updateVal[sailAreaActive] = { updated: new Date(Date.now()).toISOString(), value: null, refresh: refreshRate}
-    metas.push(buildDeltaUpdate(sailAreaTotal, { units: 'm2', timeout: refreshRate, description: 'The total area of the sails currently in use on the vessel' }))
+    metas.push(buildDeltaUpdate(sailAreaActive, { units: 'm2', timeout: refreshRate, description: 'The total area of the sails currently in use on the vessel' }))
     updateVal[sailArea] = { updated: new Date(Date.now()).toISOString(), value: null, refresh: refreshRate }
     metas.push(buildDeltaUpdate(sailAreaTotal, { units: 'm2', timeout: refreshRate, description: "An object containing information about the vessels' sails" }))
 
@@ -248,7 +248,7 @@ function handlePutCall (context, path, value, callback) {
         updateVal[sailAreaTotal].value = Inventory.map(s => Specification[s.label].area.value).reduce((sum, a) => sum+a, 0);
         update.push(buildDeltaUpdate(sailAreaTotal, updateVal[sailAreaTotal].value))
         updateVal[sailAreaActive].updated = new Date(Date.now()).toISOString()
-        updateVal[sailAreaActive].value = Inventory.map(s => s.active ? Specification[s.label].area.value : 0).reduce((sum, a) => sum+a, 0);
+        updateVal[sailAreaActive].value = Inventory.map(s => s.active ? Specification[s.label].area.value * (1-updateVal['sails.'+s.label].value.furledRatio) : 0).reduce((sum, a) => sum+a, 0);
         update.push(buildDeltaUpdate(sailAreaActive, updateVal[sailAreaActive].value))
         updateVal[sailArea].updated = new Date(Date.now()).toISOString()
         updateVal[sailArea].value = { "count": Inventory.length, "total": updateVal[sailAreaTotal].value, "active": updateVal[sailAreaActive].value }
