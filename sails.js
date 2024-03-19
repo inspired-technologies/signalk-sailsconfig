@@ -11,10 +11,14 @@
     The above copyright notice and this permission notice shall be included in all
     copies or substantial portions of the Software.
 */
+const { v4: uuidv4 } = require('uuid');
 let APPTOKEN
 const APITOKEN = 'SignalKApi/v1' // TODO: needed?
 let PLUGINID
 let refreshRate
+let pluginProps
+let updatePluginProps
+let restartPlugin
 let IDs = []
 let Sails = []
 let States = []
@@ -77,14 +81,17 @@ const init = (config, pluginid, token, refresh, loghandler) => {
     return true
 }
 
+const update = (props, update, restart) => {
+    pluginProps = props
+    updatePluginProps = update
+    restartPlugin = restart
+}
+
 function register (subscribe, sails, get, send, status) {
     status('Registering');
     let metas = []
   
     // do some initialization
-    postHandlers = [
-      { path: sailInventory, unit: '', source: APITOKEN, type: 'sail', description: 'An object containing a description of each sail available to the vessel crew' }
-    ]
     putHandlers = []
     sails.map(sail => 
     {
@@ -114,19 +121,7 @@ function register (subscribe, sails, get, send, status) {
             log(`Handler for '${h.path}' registered for ${h.source}`)
           })
     }
-    if (false && postHandlers.length>0)
-    {
-        log("Registering POST Handler ...")
-        postHandlers.forEach(h => {
-            let value = {}
-            if (h.hasOwnProperty('description')) value.description = h.description 
-            if (h.hasOwnProperty('timeout')) value.timeout = h.timeout 
-            if (value.hasOwnProperty('unit')) metas.push(buildDeltaUpdate(h.path, value))
-            updateVal[h.path] = { value: null, type: h.type, refresh: h.timeout }
-            if (h.hasOwnProperty('map')) get.publish(h.path, h.source+"|>"+h.map, h.type)
-            log(`'${h.path}' registered for publishing via ${h.source}`)
-        })
-    }
+
     if (metas.length>0)
         send.meta(metas)
 
@@ -318,6 +313,173 @@ function inventory (req, res, next) {
     res.status(200)
 }
 
+function endpoint (req, res, next) {
+    let data = req.body
+    let statusCode = 200
+    let idx = -1
+    let result = {}
+    if (!data || (typeof data==='object' && Object.keys(data).length===0))
+    {
+        let err = "Sail data not provided or invalid"
+        log(err)
+        res.status(400).send(err)
+        next()
+        return
+    } else {
+        try {
+            if (data.hasOwnProperty('id') && data.hasOwnProperty('label') && pluginProps.sails.map(s => s.id).indexOf(data.id)!==-1)
+            {   // id provided and exists -> check label and update
+                idx = pluginProps.sails.map(s => s.id).indexOf(data.id)
+                if (data.label===pluginProps.sails[idx].label)
+                    statusCode = 200
+                else
+                    statusCode = 404
+            }
+            else if (data.hasOwnProperty('label') && pluginProps.sails.map(s => s.label).indexOf(data.label)!==-1)
+            {   // id not provided but label exists -> update
+                idx = pluginProps.sails.map(s => s.label).indexOf(data.label)
+                statusCode = 200
+            }
+            else if (data.hasOwnProperty('label'))
+            {   // id not provided and label doesn't exist -> create and return ID
+                if (!data.hasOwnProperty('label') || typeof data.label!=="string" || data.label.length===0) 
+                    statusCode = 400               
+                else if (!data.hasOwnProperty('name') || typeof data.name!=="string" || data.name.length===0)
+                    statusCode = 400               
+                else if (!data.hasOwnProperty('material') || typeof data.material!=="string")
+                    statusCode = 400               
+                else if (!data.hasOwnProperty('brand') || typeof data.brand!=="string")
+                    statusCode = 400               
+                else if (!data.hasOwnProperty('type') || typeof data.type!=="string" || data.type.length===0)
+                    statusCode = 400               
+                else if (!data.hasOwnProperty('area') || typeof data.area!=="object" || !data.area.hasOwnProperty('value') || typeof data.area.value!=="number" || data.area.value===0)
+                    statusCode = 400               
+                else if (!data.hasOwnProperty('wind') || typeof data.wind!=="object" || !data.wind.hasOwnProperty('minimum') || !data.wind.hasOwnProperty('maximum') || 
+                    typeof data.wind.minimum!=="object" || typeof data.wind.maximum!=="object" || data.wind.minimum.value>=data.wind.maximum.value)
+                    statusCode = 400
+                else if (data.hasOwnProperty('states') && !Array.isArray(data.states))
+                    statusCode = 400
+                else
+                    statusCode = 201
+            }
+            else
+            {   // not enough data to work on
+                let err = "Sail data not provided or invalid"
+                log(err)
+                res.status(400).send(err)
+                next()
+                return
+            }
+            if (statusCode===201)
+            {
+                let result = {
+                    id: uuidv4(),
+                    label: data.label,
+                    name: data.name,
+                    material: data.material,
+                    brand: data.brand,
+                    type: data.type,
+                    area: data.area.value,
+                    wind: {
+                        min: data.wind.minimum.value,
+                        max: data.wind.maximum.value
+                    },
+                    states: [ {
+                        "name": "Full",
+                        "value": 1
+                      } ]
+                }
+                data.states.forEach(s => {
+                    let name = ""
+                    let value
+                    if (s.hasOwnProperty('name') && typeof s.name==="string")
+                        name = s.name
+                    else if (s.hasOwnProperty('units') && typeof s.units==="number" && s.units===0)
+                        name = "Full"
+                    else if (s.hasOwnProperty('units') && typeof s.units==="number")
+                        name = "Reef "+s.units
+                    else
+                        statusCode = 400
+                    if (s.hasOwnProperty('value') && typeof s.value==="number")
+                        value = s.value
+                    else
+                        value = 1
+                    if (name!=="Full")
+                        result.states.push({
+                            name: name,
+                            value: value
+                    })
+                })
+                log(result)
+                pluginProps.sails.push(result)
+                idx = pluginProps.sails.map(s => s.id).indexOf(result.id)
+                updatePluginProps(pluginProps, () => { log('Plugin configuration updated!') })
+                res.status(statusCode).send(`Sail ${data.label} created with id ${pluginProps.sails[idx].id}`)
+                next()
+                return    
+            } else if (statusCode===200) {
+                if (data.hasOwnProperty('name') && typeof data.name==="string" && data.name.length!==0)
+                    pluginProps.sails[idx].name = data.name
+                if (data.hasOwnProperty('material') && typeof data.material==="string" && data.material.length!==0)
+                    pluginProps.sails[idx].material = data.material
+                if (data.hasOwnProperty('brand') && typeof data.brand==="string" && data.brand.length!==0)
+                    pluginProps.sails[idx].brand = data.brand
+                if (data.hasOwnProperty('type') && typeof data.type==="string" && data.type.length!==0)
+                    pluginProps.sails[idx].type = data.type
+                if (data.hasOwnProperty('area') && typeof data.area==="number" && data.area>0)
+                    pluginProps.sails[idx].area = data.area
+                if (data.hasOwnProperty('wind') && typeof data.wind!=="object" && data.wind.hasOwnProperty('min') && data.win.hasOwnProperty('max'))
+                    pluginProps.sails[idx].wind = data.wind
+                if (data.hasOwnProperty('states') && Array.isArray(data.states) && data.states.length>0)
+                {
+                    result = [ {
+                        "name": "Full",
+                        "value": 1
+                      } ]
+                    data.states.forEach(s => {
+                        let name = ""
+                        let value
+                        if (s.hasOwnProperty('name') && typeof s.name==="string")
+                            name = s.name
+                        else if (s.hasOwnProperty('units') && typeof s.units==="number" && s.units===0)
+                            name = "Full"
+                        else if (s.hasOwnProperty('units') && typeof s.units==="number")
+                            name = "Reef "+s.units
+                        else
+                            statusCode = 400
+                        if (s.hasOwnProperty('value') && typeof s.value==="number")
+                            value = s.value
+                        else
+                            value = 1
+                        if (name!=="Full")
+                            result.push({
+                                name: name,
+                                value: value
+                        })
+                    })
+                    pluginProps.sails[idx].states = result
+                }
+                updatePluginProps(pluginProps, () => { log('Plugin configuration updated!') })
+                result = Specification[data.label]
+            } else {
+                log(`Provided data for sail ${data.label} is invalid`)
+                res.status(statusCode).send(`Invalid data for sail ${data.label}`)
+                next()
+                return    
+            }
+            log(`Inventory update processed for ${data.label}`)
+        } catch (err) {
+            log(err.message)
+            res.status(500).send(err.message)
+            next()
+            return
+        }
+    }
+    res.type('application/json')
+    res.json(result)
+    res.status(statusCode)
+}
+
 function list (active) {
     let result = []
     Inventory.forEach(sail => { 
@@ -344,8 +506,9 @@ module.exports = {
     register,        // register Put Handler
     config,          // provide current sails configuration
     list,            // list sails in the inventory
-    inventory,       // inventory endpooint
-    spec,            // specification endpooint
-    // handle,       // handle Delta Updates
+    inventory,       // inventory endpoint
+    update,          // config updates
+    endpoint,        // create or update endpoint
+    spec,            // specification endpoint
     stop,            // stop actions
 }

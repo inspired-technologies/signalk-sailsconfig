@@ -16,20 +16,21 @@
 
 const pluginId = "signalk-sailsconfig";
 const debug = require("debug")(pluginId);
-const { v1: uuidv1 } = require('uuid');
+const { v4: uuidv4 } = require('uuid');
 const sails = require('./sails')
 
 module.exports = function(app) {
   let plugin = {};
   let timer;
   let registered = false;
-
-  plugin.start = function(props) {
+  
+  plugin.start = function(props, restartPlugin) {
     debug("starting");
     app.setPluginStatus("starting");
 
     if (sails.init(props.sails, pluginId, props.putToken, props.deltaInterval, log))
     {
+      sails.update(props, app.savePluginOptions, restartPlugin)
       registered = sails.register(app.registerPutHandler, props.sails, { read: app.getSelfPath, publish: sendDelta }, { delta: sendDelta, meta: sendMeta}, app.setPluginStatus)
     }
     else
@@ -71,6 +72,7 @@ module.exports = function(app) {
       router.get('/vessels/self/sails/inventory/'+sail, sails.spec)
       router.get('/vessels/' + app.selfId + '/sails/inventory/'+sail, sails.spec)  
     })
+    router.post('/vessels/self/sails/inventory', sails.endpoint)
     app.debug("'inventory' endpoint registered");
     return router
   }
@@ -101,7 +103,7 @@ module.exports = function(app) {
             id: {
               type: "string",
               title: "Id",
-              default: uuidv1({msecs: Date.now()})
+              default: uuidv4()
             },
             label: {
               type: "string",
