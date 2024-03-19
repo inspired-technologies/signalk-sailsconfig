@@ -99,6 +99,7 @@ module.exports = function(app) {
       router.get('/vessels/self/sails/inventory/'+sail, sails.spec)
       router.get('/vessels/' + app.selfId + '/sails/inventory/'+sail, sails.spec)  
     })
+    router.post('/vessels/self/sails/inventory', sails.endpoint)
     app.debug("'inventory' endpoint registered");
     return router
   }
