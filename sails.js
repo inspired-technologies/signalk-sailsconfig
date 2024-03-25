@@ -37,35 +37,37 @@ const sailAreaTotal = pathPrefix + "area.total"
 const sailAreaActive = pathPrefix + "area.active"
 // const navigationState = 'navigation.state'
 
-const init = (config, pluginid, token, refresh, loghandler) => {
-    PLUGINID = pluginid
-    APPTOKEN = token
-    log = loghandler
-    refreshRate = refresh ? refresh>0 ? refresh : undefined : undefined 
-    // Sails & States derived from config
-    config.forEach(sail => {
-        IDs[sail.label] = sail.id
-        Sails[sail.label] = sail.state && sail.state > 0 ? 
+function setupSail (sail) {
+    let idx = Inventory.map(s => s.id).indexOf(sail.id)
+    // store sail data
+    IDs[sail.label] = sail.id
+    Sails[sail.label] = sail.state && sail.state > 0 ? 
         {
-           reduced: sail.states[sail.state-1].value!=1,
-           reefs: sail.state-1,
-           furledRatio: 1-sail.states[sail.state-1].value
+        reduced: sail.states[sail.state-1].value!=1,
+        reefs: sail.state-1,
+        furledRatio: 1-sail.states[sail.state-1].value
         }
-       : null
-       States[sail.label] = sail.states.map(s => s.name)
-       let reef = 0
-       sail.states.forEach(state => {
+        : null
+   States[sail.label] = sail.states.map(s => s.name)
+   let reef = 0
+   sail.states.forEach(state => {
         States[sail.label][state.name] = {
             reduced: state.value!=1,
             reefs: reef++,
             furledRatio: 1-state.value 
         }
-       })
-       Inventory.push({
-        label: sail.label,
-        active: sail.hasOwnProperty("state")
-       })
-       Specification[sail.label] = {
+    })
+    if (idx===-1)
+        Inventory.push({
+            id: sail.id,
+            label: sail.label,
+            active: sail.hasOwnProperty("state")
+        })
+    else {       
+        Inventory[idx].label = sail.label
+        Inventory[idx].active = sail.hasOwnProperty("state")
+    }
+    Specification[sail.label] = {
         name: sail.name,
         type: sail.type,
         material: sail.material,
@@ -75,8 +77,16 @@ const init = (config, pluginid, token, refresh, loghandler) => {
             minimum: { value: sail.wind.min, units: "m/s" },
             maximum: { value: sail.wind.max, units: "m/s" }
         }
-       }
-    })
+    }
+}
+
+const init = (config, pluginid, token, refresh, loghandler) => {
+    PLUGINID = pluginid
+    APPTOKEN = token
+    log = loghandler
+    refreshRate = refresh ? refresh>0 ? refresh : undefined : undefined 
+    // Sails & States derived from config
+    config.forEach(sail => setupSail(sail))    
     log(`Accepting PUT calls via token ${APPTOKEN}`)
     return true
 }
@@ -291,7 +301,7 @@ function inventory (req, res, next) {
             result.states = []
             for (i=0; i<States[sail.label].length; i++)
                 result.states.push({
-                    "units": i,
+                    "units": `${i}`,
                     "value": -1*States[sail.label][States[sail.label][i]].furledRatio+1
                 })
         }
@@ -317,13 +327,12 @@ function endpoint (req, res, next) {
     let data = req.body
     let statusCode = 200
     let idx = -1
-    let result = {}
+    let result = ""
     if (!data || (typeof data==='object' && Object.keys(data).length===0))
     {
         let err = "Sail data not provided or invalid"
         log(err)
         res.status(400).send(err)
-        next()
         return
     } else {
         try {
@@ -334,14 +343,29 @@ function endpoint (req, res, next) {
                     statusCode = 200
                 else
                     statusCode = 404
+                result = `Sail '${data.id}' updated`
             }
-            else if (data.hasOwnProperty('label') && pluginProps.sails.map(s => s.label).indexOf(data.label)!==-1)
+            else if (data.hasOwnProperty('id') && data.hasOwnProperty('label') && pluginProps.sails.map(s => s.id).indexOf(data.id)===-1 && 
+                pluginProps.sails.map(s => s.label).indexOf(data.label)===-1)
+            {   // id provided but does not exist yet label already exists
+                if (!data.hasOwnProperty("name") || data.name==="" || !data.hasOwnProperty("type") || data.type==="" || !data.hasOwnProperty("area") || 
+                    !data.area.hasOwnProperty('value') || data.area.value<=0 || (data.hasOwnProperty('wind') && !(data.wind.hasOwnProperty('minimum') ||
+                    data.wind.minimum.hasOwnProperty('value') || data.wind.hasOwnProperty('maximum') || data.wind.maximum.hasOwnProperty('value'))))
+                    statusCode = 400
+                else
+                {
+                    statusCode = 201
+                    result = `Sail '${data.id}' created`    
+                }
+            }
+            else if (!data.hasOwnProperty('id') && data.hasOwnProperty('label') && pluginProps.sails.map(s => s.label).indexOf(data.label)!==-1)
             {   // id not provided but label exists -> update
                 idx = pluginProps.sails.map(s => s.label).indexOf(data.label)
                 statusCode = 200
+                result = `Sail '${pluginProps.sails[idx].id}' updated`
             }
             else if (data.hasOwnProperty('label'))
-            {   // id not provided and label doesn't exist -> create and return ID
+            {   // id does not exist and label doesn't exist -> create and return ID
                 if (!data.hasOwnProperty('label') || typeof data.label!=="string" || data.label.length===0) 
                     statusCode = 400               
                 else if (!data.hasOwnProperty('name') || typeof data.name!=="string" || data.name.length===0)
@@ -364,21 +388,20 @@ function endpoint (req, res, next) {
             }
             else
             {   // not enough data to work on
-                let err = "Sail data not provided or invalid"
+                let err = "Sail data not provided or invalid!"
                 log(err)
                 res.status(400).send(err)
-                next()
                 return
             }
             if (statusCode===201)
             {
-                let result = {
-                    id: uuidv4(),
+                let sail = {
+                    id: data.hasOwnProperty('id') && data.id.length===36 ? data.id : uuidv4(),
                     label: data.label,
                     name: data.name,
                     material: data.material,
                     brand: data.brand,
-                    type: data.type,
+                    type: data.type.toLowerCase(),
                     area: data.area.value,
                     wind: {
                         min: data.wind.minimum.value,
@@ -394,9 +417,13 @@ function endpoint (req, res, next) {
                     let value
                     if (s.hasOwnProperty('name') && typeof s.name==="string")
                         name = s.name
+                    else if (s.hasOwnProperty('units') && typeof s.units==="string" && (s.units==="0" || s.units==="Full"))
+                        name = "Full"
+                    else if (s.hasOwnProperty('units') && typeof s.units==="string" && s.units!=="0")
+                        name = "Reef "+s.units
                     else if (s.hasOwnProperty('units') && typeof s.units==="number" && s.units===0)
                         name = "Full"
-                    else if (s.hasOwnProperty('units') && typeof s.units==="number")
+                    else if (s.hasOwnProperty('units') && typeof s.units==="number" && s.units!==0)
                         name = "Reef "+s.units
                     else
                         statusCode = 400
@@ -405,18 +432,19 @@ function endpoint (req, res, next) {
                     else
                         value = 1
                     if (name!=="Full")
-                        result.states.push({
+                        sail.states.push({
                             name: name,
                             value: value
                     })
                 })
-                log(result)
-                pluginProps.sails.push(result)
-                idx = pluginProps.sails.map(s => s.id).indexOf(result.id)
-                updatePluginProps(pluginProps, () => { log('Plugin configuration updated!') })
-                res.status(statusCode).send(`Sail ${data.label} created with id ${pluginProps.sails[idx].id}`)
-                next()
-                return    
+                log(sail)
+                pluginProps.sails.push(sail)
+                setupSail(sail)                
+                idx = pluginProps.sails.map(s => s.id).indexOf(sail.id)
+                result = `Sail '${pluginProps.sails[idx].id}' created`
+                updatePluginProps(pluginProps, () => { 
+                    log('Plugin configuration updated!')
+                })  
             } else if (statusCode===200) {
                 if (data.hasOwnProperty('name') && typeof data.name==="string" && data.name.length!==0)
                     pluginProps.sails[idx].name = data.name
@@ -425,14 +453,19 @@ function endpoint (req, res, next) {
                 if (data.hasOwnProperty('brand') && typeof data.brand==="string" && data.brand.length!==0)
                     pluginProps.sails[idx].brand = data.brand
                 if (data.hasOwnProperty('type') && typeof data.type==="string" && data.type.length!==0)
-                    pluginProps.sails[idx].type = data.type
-                if (data.hasOwnProperty('area') && typeof data.area==="number" && data.area>0)
-                    pluginProps.sails[idx].area = data.area
-                if (data.hasOwnProperty('wind') && typeof data.wind!=="object" && data.wind.hasOwnProperty('min') && data.win.hasOwnProperty('max'))
-                    pluginProps.sails[idx].wind = data.wind
+                    pluginProps.sails[idx].type = data.type.toLowerCase()
+                if (data.hasOwnProperty('area') && (typeof data.area==="number" || data.area.hasOwnProperty('value') && typeof data.area.value==="number" && data.area.value>0))
+                    pluginProps.sails[idx].area = typeof data.area==="number" ? data.area : data.area.value
+                if (data.hasOwnProperty('wind') && typeof data.wind==="object" && data.wind.hasOwnProperty('minimum') && data.wind.hasOwnProperty('maximum')
+                    && typeof data.wind.minimum.value==="number" && typeof data.wind.maximum.value==="number" && data.wind.minimum.value>=0 && data.wind.maximum.value>0)
+                    pluginProps.sails[idx].wind = 
+                    {   // TODO: Convert if not units=m/s
+                        min: Math.round(data.wind.minimum.value),
+                        max: Math.round(data.wind.maximum.value)
+                    }
                 if (data.hasOwnProperty('states') && Array.isArray(data.states) && data.states.length>0)
                 {
-                    result = [ {
+                    let sailstates = [ {
                         "name": "Full",
                         "value": 1
                       } ]
@@ -441,43 +474,42 @@ function endpoint (req, res, next) {
                         let value
                         if (s.hasOwnProperty('name') && typeof s.name==="string")
                             name = s.name
-                        else if (s.hasOwnProperty('units') && typeof s.units==="number" && s.units===0)
+                        else if (s.hasOwnProperty('units') && typeof s.units==="string" && (s.units==="0" || s.units==="Full"))
                             name = "Full"
-                        else if (s.hasOwnProperty('units') && typeof s.units==="number")
+                        else if (s.hasOwnProperty('units') && typeof s.units==="string")
                             name = "Reef "+s.units
                         else
                             statusCode = 400
                         if (s.hasOwnProperty('value') && typeof s.value==="number")
-                            value = s.value
+                            value = Math.round(s.value*100)/100
                         else
                             value = 1
                         if (name!=="Full")
-                            result.push({
+                            sailstates.push({
                                 name: name,
                                 value: value
                         })
                     })
-                    pluginProps.sails[idx].states = result
+                    pluginProps.sails[idx].states = sailstates
                 }
-                updatePluginProps(pluginProps, () => { log('Plugin configuration updated!') })
-                result = Specification[data.label]
+                setupSail(pluginProps.sails[idx])
+                updatePluginProps(pluginProps, () => { 
+                    log('Plugin configuration updated!')
+                })
+                log(Specification[data.label])
             } else {
                 log(`Provided data for sail ${data.label} is invalid`)
-                res.status(statusCode).send(`Invalid data for sail ${data.label}`)
-                next()
+                res.status(statusCode).send(`Invalid data for sail ${data.label} with id '${idx===-1 ? data.id : pluginProps.sails[idx].id}'`)
                 return    
             }
             log(`Inventory update processed for ${data.label}`)
         } catch (err) {
             log(err.message)
             res.status(500).send(err.message)
-            next()
             return
         }
     }
-    res.type('application/json')
-    res.json(result)
-    res.status(statusCode)
+    res.status(statusCode).send(result)
 }
 
 function list (active) {
@@ -499,6 +531,21 @@ function spec (req, res, next) {
     res.status(200)
 }
 
+function area (req, res, next) {
+    let label = req.route.path.split('/')[req.route.path.split('/').length-2]
+    res.type('application/json')
+    res.json(Specification[label]===undefined ? null : {
+        value: Specification[label].area.value,
+        meta: {
+            units: Specification[label].area.units,
+            description: "Square meter: m2 or sqm"
+        },
+        "$source": "signalk-sailsconfig",
+    })
+    log(`Area of ${label}${Specification[label]===undefined ? " not " : " "}retrieved`)
+    res.status(200)
+}
+
 const stop = () => {}
 
 module.exports = {
@@ -510,5 +557,6 @@ module.exports = {
     update,          // config updates
     endpoint,        // create or update endpoint
     spec,            // specification endpoint
+    area,            // area endpoint
     stop,            // stop actions
 }
