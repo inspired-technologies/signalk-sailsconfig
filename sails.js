@@ -253,7 +253,7 @@ function handlePutCall (context, path, value, callback) {
         updateVal[sailAreaTotal].value = Inventory.map(s => Specification[s.label].area.value).reduce((sum, a) => sum+a, 0);
         update.push(buildDeltaUpdate(sailAreaTotal, updateVal[sailAreaTotal].value))
         updateVal[sailAreaActive].updated = new Date(Date.now()).toISOString()
-        updateVal[sailAreaActive].value = Inventory.map(s => s.active ? Specification[s.label].area.value * (1-updateVal['sails.'+s.label].value.furledRatio) : 0).reduce((sum, a) => sum+a, 0);
+        updateVal[sailAreaActive].value = Inventory.map(s => s.active && updateVal['sails.'+s.label].value ? Specification[s.label].area.value * (1-updateVal['sails.'+s.label].value.furledRatio) : 0).reduce((sum, a) => sum+a, 0);
         update.push(buildDeltaUpdate(sailAreaActive, updateVal[sailAreaActive].value))
         updateVal[sailArea].updated = new Date(Date.now()).toISOString()
         updateVal[sailArea].value = { "count": Inventory.length, "total": updateVal[sailAreaTotal].value, "active": updateVal[sailAreaActive].value }
