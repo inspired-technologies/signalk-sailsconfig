@@ -1,6 +1,6 @@
 {
   "name": "signalk-sailsconfig",
-  "version": "0.6.1",
+  "version": "0.6.5",
   "description": "SignalK Sails Configuration (plugin & api)",
   "main": "index.js",
   "scripts": {
@@ -24,8 +24,8 @@
   },
   "homepage": "https://github.com/inspired-technologies/signalk-sailsconfig#readme",
   "dependencies": {
-    "debug": "^4.3.4",
-    "uuid": "^9.0.1"
+    "debug": "^4.4.0",
+    "uuid": "^11.0.4"
   },
   "devDependencies": {
     "@signalk/github-create-release": "^1.2.1"
