@@ -1,13 +1,13 @@
 openapi: 3.0.3
 info:
-  title: Signal K Sails configuration
+  title: SignalK SailsConfig API
   description: API for managing the state of the vessel's sails with Signal K
   version: 0.1.0
 servers:
   - url: http://localhost:3000
 tags:
   - name: sails
-    description: Sail management
+    description: Sail Management
 paths:
   /sails:
     get:

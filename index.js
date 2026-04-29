@@ -83,7 +83,6 @@ module.exports = function(app) {
     setDeltas();
     debug("started");
     app.setPluginStatus("Started");
-    app.setPluginStatus("Started");
   };
 
   plugin.stop = function() {
@@ -92,36 +91,6 @@ module.exports = function(app) {
     debug("stopped");
   };
 
-  plugin.signalKApiRoutes = function (router) {
-    router.get('/vessels/self/sails/inventory', sails.inventory)
-    router.get('/vessels/' + app.selfId + '/sails/inventory', sails.inventory)
-    sails.list().forEach(sail =>
-    {
-      router.get('/vessels/self/sails/inventory/'+sail, sails.spec)
-      router.get('/vessels/' + app.selfId + '/sails/inventory/'+sail, sails.spec)  
-      router.get('/vessels/self/sails/inventory/'+sail+'/area', sails.area)
-      router.get('/vessels/' + app.selfId + '/sails/inventory/'+sail+'/area', sails.area)  
-    })
-    router.post('/vessels/self/sails/inventory', sails.endpoint)
-    app.debug("'inventory' endpoint registered");
-    return router
-  }
-
-  plugin.signalKApiRoutes = function (router) {
-    router.get('/vessels/self/sails/inventory', sails.inventory)
-    router.get('/vessels/' + app.selfId + '/sails/inventory', sails.inventory)
-    sails.list().forEach(sail =>
-    {
-      router.get('/vessels/self/sails/inventory/'+sail, sails.spec)
-      router.get('/vessels/' + app.selfId + '/sails/inventory/'+sail, sails.spec)  
-      router.get('/vessels/self/sails/inventory/'+sail+'/area', sails.area)
-      router.get('/vessels/' + app.selfId + '/sails/inventory/'+sail+'/area', sails.area)  
-    })
-    router.post('/vessels/self/sails/inventory', sails.endpoint)
-    app.debug("'inventory' endpoint registered");
-    return router
-  }
-
   plugin.id = pluginId;
   plugin.name = "Sails Configuration";
   plugin.description =
@@ -129,7 +98,6 @@ module.exports = function(app) {
 
   plugin.schema = {
     type: "object",
-    required: ["deltaInterval", "putToken"],
     required: ["deltaInterval", "putToken"],
     properties: {
       deltaInterval: {
@@ -141,10 +109,7 @@ module.exports = function(app) {
         type: "string",
         default: "SailsConfig/1.0.0"
       },
-      putToken: {
-        type: "string",
-        default: "SailsConfig/1.0.0"
-      },
+
       sails: {
         type: "array",
         title: "Sail inventory",
