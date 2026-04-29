@@ -14,6 +14,7 @@
     copies or substantial portions of the Software.
 */
 const openAPI = require('./openapi.json');
+const { SailValidator, UpdateValidator, StatusValidator, StateValidator } = require('./validator.js');
 
 const pluginId = "signalk-sailsconfig";
 
@@ -77,12 +78,27 @@ module.exports = function(app) {
     }
   }
 
+  function setState(sail, state) {
+    sail.reducedState = state;
+    if (state && sail.continuousReefing) {
+      // If continuousReefing is set, use furledRatio
+      sail.reducedState.reefs = undefined;
+      sail.reefs = []; 
+    } else if (state && !sail.continuousReefing) {
+      if (state.reefs > 0 && (sail.reefs[state.reefs-1] === 0 || sail.reefs[state.reefs-1] === undefined))
+      // If both reefs and furledRatio are set, use reefs
+      sail.reefs[state.reefs-1] = state.furledRatio * sail.area;
+      if (state.reefs >= 0)
+        sail.reducedState.furledRatio = undefined;
+    }
+    debug(`setting state of ${sail.name} to ${JSON.stringify(sail.reducedState)}`);
+  }
+
   plugin.start = function(props) {
     debug("starting");
     timer = setInterval(setDeltas, props.deltaInterval * 1000);
     setDeltas();
     debug("started");
-    app.setPluginStatus("Started");
   };
 
   plugin.stop = function() {
@@ -94,22 +110,17 @@ module.exports = function(app) {
   plugin.id = pluginId;
   plugin.name = "Sails Configuration";
   plugin.description =
-    "Plugin to define and manage your vessel's sails inventory and configuration";
+    "Plugin that allows you to define your vessel's sails inventory and configuration";
 
   plugin.schema = {
     type: "object",
-    required: ["deltaInterval", "putToken"],
+    required: ["deltaInterval"],
     properties: {
       deltaInterval: {
         title: 'How often should this plugin update the state, in seconds',
         type: "number",
         default: 60
       },
-      putToken: {
-        type: "string",
-        default: "SailsConfig/1.0.0"
-      },
-
       sails: {
         type: "array",
         title: "Sail inventory",
@@ -120,7 +131,7 @@ module.exports = function(app) {
             id: {
               type: "string",
               title: "Id",
-              pattern: "(^[a-zA-Z0-9]+$)",
+              pattern: "(^[a-zA-Z0-9-]+$)",
             },
             name: {
               type: "string",
@@ -156,6 +167,7 @@ module.exports = function(app) {
                 "lug",
                 "mizzen",
                 "steadying sail",
+                "other"
               ],
             },
             material: {
@@ -235,6 +247,82 @@ module.exports = function(app) {
       });
       res.send(JSON.stringify(result));
     });
+    router.post('/sails', function(req, res) {
+      res.contentType('application/json');
+      let { configuration } = app.readPluginOptions();
+      let failed = false;
+      const validator = new SailValidator();
+      let validationResult = {}
+      req.body.forEach(function (sail) {
+        const sailInConfig = configuration.sails.find((s) => s.id === sail.id);
+        const val = validator.validate(sail);
+        if (Object.keys(val).length > 0) {
+          failed = true;
+          validationResult[sail.name || sail.id] = val;
+          return;
+        }
+        if (!sailInConfig) {
+          // Provided a new valid Sail
+          if (!configuration.sails) {
+            configuration.sails = [];
+          }
+          configuration.sails.push(sail);
+          // New sails are not active by default
+          sail.active = false; 
+          sail.reducedState = {
+            reefs: sail.continuousReefing ? undefined : 0,
+            furledRatio: sail.continuousReefing ? 0: undefined,
+          };
+        } else {
+          // Existing Sail, update with a valid configuration
+          sailInConfig.name = sail.name;
+          sailInConfig.description = sail.description;
+          sailInConfig.type = sail.type;
+          sailInConfig.material = sail.material;
+          sailInConfig.brand = sail.brand;
+          sailInConfig.area = sail.area;
+          sailInConfig.minimumWind = sail.minimumWind;
+          sailInConfig.maximumWind = sail.maximumWind;
+          sailInConfig.reefs = sail.reefs || [];
+          sailInConfig.continuousReefing = !!sail.continuousReefing;
+          if (sail.reducedState) {
+            // If reducedState is provided, use it, otherwise reset to default
+            sailInConfig.reducedState = {
+              reefs: sail.continuousReefing ? undefined : 0,
+              furledRatio: sail.continuousReefing ? 0: undefined,
+            };
+          } else {
+            // Reset to default
+            sailInConfig.reducedState = undefined;
+          }
+        }
+      });
+      // Deactivate any saild _not_ provided in payload
+      const payloadIds = req.body.map((s) => s.id);
+      configuration.sails.filter((s) => !payloadIds.includes(s.id)).forEach((s) => {
+        s.active = false;
+      });
+      if (failed) {
+        res.status(400).send(JSON.stringify(validationResult));
+        return;
+      }
+      app.savePluginOptions(configuration, function (err) {
+        if (err) {
+          res.sendStatus(500);
+          return;
+        }
+        setDeltas();
+        const result = configuration.sails.map(function(sail) {
+          return {
+            id: sail.id,
+            name: sail.name,
+            active: sail.active,
+            reducedState: sail.reducedState,
+          };
+        });
+        res.send(JSON.stringify(result));
+      });
+    });
     router.put('/sails', function(req, res) {
       res.contentType('application/json');
       let { configuration } = app.readPluginOptions();
@@ -244,19 +332,22 @@ module.exports = function(app) {
         return;
       }
       let failed = false;
+      let validationResult = {}
       req.body.forEach(function (sail) {
-        if (failed) {
-          return;
-        }
         const sailInConfig = configuration.sails.find((s) => s.id === sail.id);
-        if (!sailInConfig) {
-          // Trying to set state to unknown sail, fail
+        let val = {}
+        if (!sailInConfig)
+          val["id"] = "Sail Id not found in configuration!" 
+        const validator = new UpdateValidator(sailInConfig && Array.isArray(sailInConfig.reefs) ? sailInConfig.reefs.length : undefined);
+        Object.assign(val, validator.validate(sail));
+        if (Object.keys(val).length > 0) {
+          // Trying to set state to unknown sail or invalid status, fail
           failed = true;
-          res.sendStatus(400);
+          validationResult[sail.id] = val;
           return;
         }
         sailInConfig.active = sail.active;
-        sailInConfig.reducedState = sail.reducedState;
+        setState(sailInConfig, sail.reducedState);
       });
       // Deactivate any saild _not_ provided in payload
       const payloadIds = req.body.map((s) => s.id);
@@ -264,6 +355,7 @@ module.exports = function(app) {
         s.active = false;
       });
       if (failed) {
+        res.status(400).send(JSON.stringify(validationResult));
         return;
       }
       app.savePluginOptions(configuration, function (err) {
@@ -290,6 +382,13 @@ module.exports = function(app) {
       });
       if (!sailInConfig) {
         res.sendStatus(404);
+        return;
+      }
+      // If active is provided, use it, otherwise do not change
+      const validator = new StatusValidator();
+      const val = validator.validate(req.body);
+      if (Object.keys(val).length > 0) {
+        res.status(400).send(JSON.stringify(val));
         return;
       }
       sailInConfig.active = req.body.value;
@@ -319,7 +418,14 @@ module.exports = function(app) {
         res.sendStatus(404);
         return;
       }
-      sailInConfig.reducedState = req.body;
+      // If reducedState is provided, use it, otherwise do not change
+      const validator = new StateValidator(Array.isArray(sailInConfig.reefs) ? sailInConfig.reefs.length : undefined);
+      const val = validator.validate(req.body);
+      if (Object.keys(val).length > 0) {
+        res.status(400).send(JSON.stringify(val));
+        return;
+      }
+      setState(sailInConfig, req.body);
       app.savePluginOptions(configuration, function (err) {
         if (err) {
           res.sendStatus(500);

@@ -1,10 +1,12 @@
 {
   "name": "signalk-sailsconfig",
-  "version": "0.9.0",
+  "version": "0.9.5",
   "description": "SignalK Sails Configuration (plugin & api)",
   "main": "index.js",
   "scripts": {
-    "build": "js-yaml openapi.yaml > openapi.json",
+    "build:openapi": "js-yaml openapi.yaml > openapi.json",
+    "build:ts": "tsc validator.ts",
+    "build": "npm run build:openapi && npm run build:ts",
     "prepublishOnly": "npm run build",
     "test": "echo \"Error: no test specified\" && exit 1",
     "debug": "node --inspect-brk=192.168.0.97:9229 /usr/local/lib/node_modules/signalk-server/bin/signalk-server -c /home/pi/signalk"
@@ -26,5 +28,8 @@
   "homepage": "https://github.com/inspired-technologies/signalk-sailsconfig#readme",
   "devDependencies": {
     "js-yaml": "^4.1.0"
+  },
+  "dependencies": {
+    "fluentvalidation-ts": "^5.0.0"
   }
 }
