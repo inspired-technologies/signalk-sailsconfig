@@ -83,6 +83,7 @@ module.exports = function(app) {
     setDeltas();
     debug("started");
     app.setPluginStatus("Started");
+    app.setPluginStatus("Started");
   };
 
   plugin.stop = function() {
@@ -90,6 +91,21 @@ module.exports = function(app) {
     timer && clearTimeout(timer);
     debug("stopped");
   };
+
+  plugin.signalKApiRoutes = function (router) {
+    router.get('/vessels/self/sails/inventory', sails.inventory)
+    router.get('/vessels/' + app.selfId + '/sails/inventory', sails.inventory)
+    sails.list().forEach(sail =>
+    {
+      router.get('/vessels/self/sails/inventory/'+sail, sails.spec)
+      router.get('/vessels/' + app.selfId + '/sails/inventory/'+sail, sails.spec)  
+      router.get('/vessels/self/sails/inventory/'+sail+'/area', sails.area)
+      router.get('/vessels/' + app.selfId + '/sails/inventory/'+sail+'/area', sails.area)  
+    })
+    router.post('/vessels/self/sails/inventory', sails.endpoint)
+    app.debug("'inventory' endpoint registered");
+    return router
+  }
 
   plugin.signalKApiRoutes = function (router) {
     router.get('/vessels/self/sails/inventory', sails.inventory)
@@ -114,11 +130,16 @@ module.exports = function(app) {
   plugin.schema = {
     type: "object",
     required: ["deltaInterval", "putToken"],
+    required: ["deltaInterval", "putToken"],
     properties: {
       deltaInterval: {
         title: 'How often should this plugin update the state, in seconds',
         type: "number",
         default: 60
+      },
+      putToken: {
+        type: "string",
+        default: "SailsConfig/1.0.0"
       },
       putToken: {
         type: "string",
