@@ -138,10 +138,10 @@ module.exports = function(app) {
               title: "Name or Label",
               description: "An unique identifier by which the crew identifies a sail"
             },
-            name: {
-              type: "bool",
-              title: "Name or Label",
-              description: "An unique identifier by which the crew identifies a sail"
+            description: {
+              type: "string",
+              title: "Description",
+              description: "A brief description of the sail"
             },
             material: {
               type: "string",
@@ -150,8 +150,8 @@ module.exports = function(app) {
             },
             brand: {
               type: "string",
-              title: "Description",
-              'ui:widget': 'textarea',
+              title: "Brand",
+              description: "[Optional] The brand of the sail",
             },
             type: {
               type: "string",
@@ -169,14 +169,6 @@ module.exports = function(app) {
                 "steadying sail",
                 "other"
               ],
-            },
-            material: {
-              type: 'string',
-              title: 'Material',
-            },
-            brand: {
-              type: 'string',
-              title: 'Brand',
             },
             active: {
               type: 'boolean',
