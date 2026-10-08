@@ -9,3 +9,6 @@ validator.ts
 public_src/
 src/
 webpack.config.js
+
+#test
+test/
