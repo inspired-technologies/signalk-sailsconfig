@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "build:openapi": "js-yaml openapi.yaml > openapi.json",
-    "build:ts": "tsc validator.ts",
+    "build:ts": "tsc --module commonjs --target es2022 validator.ts",
     "build": "npm run build:openapi && npm run build:ts",
     "prepublishOnly": "npm run build",
     "pretest": "npm run build",
@@ -29,7 +29,7 @@
   "homepage": "https://github.com/inspired-technologies/signalk-sailsconfig#readme",
   "devDependencies": {
     "js-yaml": "^5.2.3",
-    "typescript": "^5.9.2"
+    "typescript": "^7.0.2"
   },
   "dependencies": {
     "fluentvalidation-ts": "^5.0.0"
