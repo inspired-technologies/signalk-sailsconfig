@@ -234,7 +234,7 @@ module.exports = function(app) {
     scoped(router, 'readonly').get('/sails', function(req, res) {
       res.contentType('application/json');
       const { configuration } = app.readPluginOptions();
-      if (!configuration) {
+      if (!configuration || !configuration.sails) {
         res.send(JSON.stringify([]));
         return;
       }
@@ -253,6 +253,14 @@ module.exports = function(app) {
     router.post('/sails', function(req, res) {
       res.contentType('application/json');
       let { configuration } = app.readPluginOptions();
+      if (!configuration) {
+        // Nothing stored yet: the first sail starts the configuration, with
+        // the schema defaults so the plugin restarts with a valid interval
+        configuration = { deltaInterval: plugin.schema.properties.deltaInterval.default };
+      }
+      if (!configuration.sails) {
+        configuration.sails = [];
+      }
       let failed = false;
       const validator = new SailValidator();
       let validationResult = {}
@@ -266,9 +274,6 @@ module.exports = function(app) {
         }
         if (!sailInConfig) {
           // Provided a new valid Sail
-          if (!configuration.sails) {
-            configuration.sails = [];
-          }
           configuration.sails.push(sail);
           // New sails are not active by default
           sail.active = false; 
@@ -288,16 +293,13 @@ module.exports = function(app) {
           sailInConfig.maximumWind = sail.maximumWind;
           sailInConfig.reefs = sail.reefs || [];
           sailInConfig.continuousReefing = !!sail.continuousReefing;
-          if (sail.reducedState) {
-            // If reducedState is provided, use it, otherwise reset to default
-            sailInConfig.reducedState = {
-              reefs: sail.continuousReefing ? undefined : 0,
-              furledRatio: sail.continuousReefing ? 0: undefined,
-            };
-          } else {
-            // Reset to default
-            sailInConfig.reducedState = undefined;
-          }
+          // Keep the provided (validated) reefing state in the sail's own mode:
+          // furledRatio for continuous reefing, reefs otherwise. Without one
+          // the sail returns to its unreduced state.
+          const state = sail.reducedState || {};
+          sailInConfig.reducedState = sailInConfig.continuousReefing
+            ? { reefs: undefined, furledRatio: typeof state.furledRatio === 'number' ? state.furledRatio : 0 }
+            : { reefs: typeof state.reefs === 'number' ? state.reefs : 0, furledRatio: undefined };
         }
       });
       // Deactivate any saild _not_ provided in payload
@@ -329,7 +331,7 @@ module.exports = function(app) {
     scoped(router, 'readwrite').put('/sails', function(req, res) {
       res.contentType('application/json');
       let { configuration } = app.readPluginOptions();
-      if (!configuration) {
+      if (!configuration || !configuration.sails) {
         // If there is no sails inventory, there is no valid payload we can accept
         res.sendStatus(400);
         return;
@@ -373,7 +375,7 @@ module.exports = function(app) {
     scoped(router, 'readwrite').put('/sails/:id/active', function(req, res) {
       res.contentType('application/json');
       const { configuration } = app.readPluginOptions();
-      if (!configuration) {
+      if (!configuration || !configuration.sails) {
         res.sendStatus(404);
         return;
       }
@@ -407,7 +409,7 @@ module.exports = function(app) {
     scoped(router, 'readwrite').put('/sails/:id/reducedState', function(req, res) {
       res.contentType('application/json');
       const { configuration } = app.readPluginOptions();
-      if (!configuration) {
+      if (!configuration || !configuration.sails) {
         res.sendStatus(404);
         return;
       }
