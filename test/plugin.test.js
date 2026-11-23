@@ -79,6 +79,22 @@ describe('plugin baseline', () => {
       });
     });
   });
+
+  it('opens reading to readonly and state changes to readwrite, editing stays admin', () => {
+    const plugin = pluginFactory(createApp(sampleConfiguration()));
+    const router = createRouter({ access: true });
+
+    plugin.registerWithRouter(router);
+
+    const levels = Object.fromEntries(router.routes.map((r) => [`${r.method} ${r.path}`, r.level]));
+    assert.deepEqual(levels, {
+      'GET /sails': 'readonly',
+      'POST /sails': 'admin',
+      'PUT /sails': 'readwrite',
+      'PUT /sails/:id/active': 'readwrite',
+      'PUT /sails/:id/reducedState': 'readwrite',
+    });
+  });
 });
 
 describe('plugin lifecycle', () => {

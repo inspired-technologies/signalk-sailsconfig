@@ -89,9 +89,9 @@ describe('POST /sails', () => {
     assert.deepEqual(app.errors, []);
   });
 
-  it('updates an existing sail and resets its reefing state', (t) => {
+  it('updates an existing sail and keeps the provided reefing state', (t) => {
     const configuration = sampleConfiguration();
-    configuration.sails[0].reducedState = { reefs: 2 };
+    configuration.sails[0].reducedState = { reefs: 0 };
     const { app, router } = setup(t, configuration);
 
     const res = router.request('POST', '/sails', [
@@ -110,9 +110,75 @@ describe('POST /sails', () => {
     assert.equal(main.area, 45);
     assert.deepEqual(main.reefs, [35, 25]);
     assert.equal(main.description, 'The heavy weather jib');
-    // a sail that is edited always returns to its unreduced state
-    assert.deepEqual(main.reducedState, { reefs: 0, furledRatio: undefined });
+    assert.deepEqual(main.reducedState, { reefs: 2, furledRatio: undefined });
     assert.equal(app.configuration.sails.length, 2);
+  });
+
+  it('keeps the furled ratio of an edited continuously reefing sail', (t) => {
+    const { app, router } = setup(t, sampleConfiguration());
+
+    const res = router.request('POST', '/sails', [
+      stormJib({
+        id: 'genoa',
+        name: 'Genoa',
+        type: 'genoa',
+        area: 50,
+        continuousReefing: true,
+        reducedState: { furledRatio: 0.4 },
+      }),
+    ]);
+
+    assert.equal(res.statusCode, 200);
+    const genoa = app.configuration.sails.find((s) => s.id === 'genoa');
+    assert.deepEqual(genoa.reducedState, { reefs: undefined, furledRatio: 0.4 });
+  });
+
+  it('puts an edited sail that changes its reefing mode into the new mode', (t) => {
+    const configuration = sampleConfiguration();
+    configuration.sails[0].reducedState = { reefs: 2 };
+    const { app, router } = setup(t, configuration);
+
+    // the main becomes a furling main; a state given in reefs does not apply
+    const res = router.request('POST', '/sails', [
+      stormJib({
+        id: 'main',
+        name: 'Main',
+        type: 'mainsail',
+        area: 40,
+        continuousReefing: true,
+        reducedState: { reefs: 0 },
+      }),
+    ]);
+
+    assert.equal(res.statusCode, 200);
+    const main = app.configuration.sails.find((s) => s.id === 'main');
+    assert.deepEqual(main.reducedState, { reefs: undefined, furledRatio: 0 });
+  });
+
+  it('starts the inventory when no configuration is stored yet', (t) => {
+    const { app, router } = setup(t, undefined);
+
+    const res = router.request('POST', '/sails', [stormJib()]);
+
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.json(), [
+      { id: 'storm', name: 'Storm Jib', active: false, reducedState: { reefs: 0 } },
+    ]);
+    // the stored configuration is complete, the plugin restarts with it
+    assert.equal(app.saves.length, 1);
+    assert.equal(app.saves[0].deltaInterval, 60);
+    assert.equal(app.saves[0].sails.length, 1);
+    assert.equal(valueAt(app, 'sails.area.total'), 12);
+  });
+
+  it('starts the inventory when the configuration holds no sails', (t) => {
+    const { app, router } = setup(t, { deltaInterval: 30 });
+
+    const res = router.request('POST', '/sails', [stormJib()]);
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(app.saves[0].deltaInterval, 30);
+    assert.deepEqual(app.saves[0].sails.map((s) => s.id), ['storm']);
   });
 
   it('deactivates every sail that is missing from the payload', (t) => {
@@ -336,5 +402,36 @@ describe('PUT /sails/:id/reducedState', () => {
     app.saveError = new Error('cannot write plugin options');
 
     assert.equal(router.request('PUT', '/sails/main/reducedState', { reefs: 1 }).statusCode, 500);
+  });
+});
+
+// The plugin settings can be saved with a delta interval only, before any
+// sail is entered: every route answers as if no inventory was configured.
+describe('configuration without sails', () => {
+  it('GET /sails returns an empty inventory', (t) => {
+    const { router } = setup(t, { deltaInterval: 60 });
+
+    const res = router.request('GET', '/sails');
+
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.json(), []);
+  });
+
+  it('PUT /sails rejects the payload', (t) => {
+    const { app, router } = setup(t, { deltaInterval: 60 });
+
+    const res = router.request('PUT', '/sails', [
+      { id: 'main', active: true, reducedState: { reefs: 0 } },
+    ]);
+
+    assert.equal(res.statusCode, 400);
+    assert.deepEqual(app.saves, []);
+  });
+
+  it('PUT /sails/:id/active and /reducedState return 404', (t) => {
+    const { router } = setup(t, { deltaInterval: 60 });
+
+    assert.equal(router.request('PUT', '/sails/main/active', { value: true }).statusCode, 404);
+    assert.equal(router.request('PUT', '/sails/main/reducedState', { reefs: 0 }).statusCode, 404);
   });
 });

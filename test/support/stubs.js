@@ -98,7 +98,10 @@ function createResponse() {
 
 // Stand-in for the express router the SignalK server passes to
 // plugin.registerWithRouter, with just enough routing to dispatch a request.
-function createRouter() {
+// With { access: true } it also offers router.access(level) like Signal K
+// 2.x servers and records the level of each route; a route registered on the
+// plain router keeps the level 'admin', the server's default for plugin routes.
+function createRouter({ access = false } = {}) {
   const routes = [];
 
   function match(method, url) {
@@ -134,11 +137,19 @@ function createRouter() {
     },
   };
 
-  ['get', 'post', 'put', 'delete'].forEach((method) => {
-    router[method] = (path, handler) => {
-      routes.push({ method: method.toUpperCase(), path, handler });
-    };
-  });
+  function register(target, level) {
+    ['get', 'post', 'put', 'delete'].forEach((method) => {
+      target[method] = (path, handler) => {
+        routes.push({ method: method.toUpperCase(), path, handler, level });
+      };
+    });
+    return target;
+  }
+
+  register(router, 'admin');
+  if (access) {
+    router.access = (level) => register({}, level);
+  }
 
   return router;
 }
