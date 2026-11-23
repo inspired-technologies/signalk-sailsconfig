@@ -1,7 +1,10 @@
 openapi: 3.0.3
 info:
   title: SignalK SailsConfig API
-  description: API for managing the state of the vessel's sails with Signal K
+  description: >-
+    API for managing the state of the vessel's sails with Signal K.
+    Reading needs readonly access, changing the state of the sails needs
+    readwrite access and editing the sail inventory needs admin access.
   version: 1.0.0
 servers:
   - url: http://localhost:3000

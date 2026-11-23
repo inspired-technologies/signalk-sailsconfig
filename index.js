@@ -221,8 +221,17 @@ module.exports = function(app) {
     }
   };
 
+  // Signal K 2.x treats every /plugins/<id>/ route as admin-only unless the
+  // plugin opens it with router.access(level). Reading the sails needs
+  // readonly, changing their state readwrite, so devices and clients that are
+  // not admin (e.g. an MFD with a device token) can use them. Older servers
+  // have no router.access and just get the plain router.
+  function scoped(router, level) {
+    return typeof router.access === 'function' ? router.access(level) : router;
+  }
+
   plugin.registerWithRouter = function(router) {
-    router.get('/sails', function(req, res) {
+    scoped(router, 'readonly').get('/sails', function(req, res) {
       res.contentType('application/json');
       const { configuration } = app.readPluginOptions();
       if (!configuration) {
@@ -239,6 +248,8 @@ module.exports = function(app) {
       });
       res.send(JSON.stringify(result));
     });
+    // Editing the sail inventory is plugin configuration, so it stays
+    // admin-only (plain router) instead of readwrite.
     router.post('/sails', function(req, res) {
       res.contentType('application/json');
       let { configuration } = app.readPluginOptions();
@@ -315,7 +326,7 @@ module.exports = function(app) {
         res.send(JSON.stringify(result));
       });
     });
-    router.put('/sails', function(req, res) {
+    scoped(router, 'readwrite').put('/sails', function(req, res) {
       res.contentType('application/json');
       let { configuration } = app.readPluginOptions();
       if (!configuration) {
@@ -359,7 +370,7 @@ module.exports = function(app) {
         res.sendStatus(200);
       });
     });
-    router.put('/sails/:id/active', function(req, res) {
+    scoped(router, 'readwrite').put('/sails/:id/active', function(req, res) {
       res.contentType('application/json');
       const { configuration } = app.readPluginOptions();
       if (!configuration) {
@@ -393,7 +404,7 @@ module.exports = function(app) {
         res.sendStatus(200);
       });
     });
-    router.put('/sails/:id/reducedState', function(req, res) {
+    scoped(router, 'readwrite').put('/sails/:id/reducedState', function(req, res) {
       res.contentType('application/json');
       const { configuration } = app.readPluginOptions();
       if (!configuration) {
