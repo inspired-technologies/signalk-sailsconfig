@@ -8,6 +8,7 @@
     "build:ts": "tsc validator.ts",
     "build": "npm run build:openapi && npm run build:ts",
     "prepublishOnly": "npm run build",
+    "pretest": "npm run build",
     "test": "node --test test/*.js",
     "debug": "node --inspect-brk=192.168.0.97:9229 /usr/lib/node_modules/signalk-server/bin/signalk-server -c /home/pi/signalk"
   },
@@ -27,7 +28,8 @@
   },
   "homepage": "https://github.com/inspired-technologies/signalk-sailsconfig#readme",
   "devDependencies": {
-    "js-yaml": "^5.2.3"
+    "js-yaml": "^5.2.3",
+    "typescript": "^5.9.2"
   },
   "dependencies": {
     "fluentvalidation-ts": "^5.0.0"
