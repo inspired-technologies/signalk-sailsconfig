@@ -12,3 +12,7 @@ webpack.config.js
 
 #test
 test/
+
+#AI & internal
+.ai
+CLAUDE.md

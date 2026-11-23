@@ -40,3 +40,6 @@ jspm_packages
 openapi.json
 validator.js
 
+# AI
+.ai/
+CLAUDE.md
