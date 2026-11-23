@@ -22,7 +22,7 @@
     "signalk-webapp"
   ],
   "author": "Inspired Technologies",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "bugs": {
     "url": "https://github.com/inspired-technologies/signalk-sailsconfig/issues"
   },
