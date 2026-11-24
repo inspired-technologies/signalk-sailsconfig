@@ -165,6 +165,8 @@ module.exports = function(app) {
                 "genoa",
                 "spinnaker",
                 "gennaker",
+                "code zero",
+                "screecher",
                 "mainsail",
                 "lug",
                 "mizzen",
