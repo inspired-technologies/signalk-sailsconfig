@@ -4,7 +4,7 @@ type Sail = {
   id: string;
   name: string;
   description: string;
-  // type: Enumerator<'mainsail' | 'jib' | 'genoa' | 'spinnaker' | 'gennaker' | 'staysail' | 'headsail' | 'lug' | 'mizzen' | 'steadying sail' | 'other'>;
+  // type: one of the sail types of the plugin schema (index.js), checked by SailValidator
   type: string;
   material: string;
   brand: string;
@@ -48,6 +48,8 @@ class SailValidator extends Validator<Sail> {
           'genoa',
           'spinnaker',
           'gennaker',
+          'code zero',
+          'screecher',
           'staysail',
           'headsail',
           'lug',
@@ -76,7 +78,7 @@ class SailValidator extends Validator<Sail> {
     this.ruleFor('type')
       .notUndefined()
       .must(value => types.indexOf(value)!==-1)
-      .withMessage('Sail type must be one of: mainsail, jib, genoa, spinnaker, gennaker, staysail, headsail, lug, mizzen, steadying sail, other!');
+      .withMessage(`Sail type must be one of: ${types.join(', ')}!`);
     
     this.ruleFor('material')
       .minLength(0).maxLength(50)
