@@ -8,19 +8,12 @@ const {
   StateValidator,
 } = require('../validator.js');
 
-const SAIL_TYPES = [
-  'mainsail',
-  'jib',
-  'genoa',
-  'spinnaker',
-  'gennaker',
-  'staysail',
-  'headsail',
-  'lug',
-  'mizzen',
-  'steadying sail',
-  'other',
-];
+const pluginFactory = require('../index');
+const { createApp } = require('./support/stubs');
+
+// The sail types offered by the plugin settings are the reference: every one
+// of them has to pass the API validation as well.
+const SAIL_TYPES = pluginFactory(createApp()).schema.properties.sails.items.properties.type.enum;
 
 function sail(overrides) {
   return Object.assign(
