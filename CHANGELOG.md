@@ -10,6 +10,7 @@
 - License: Apache 2.0 as the upstream @signalk/sailsconfiguration (was stated as MIT)
 - Workflows: current action versions, release artifact name fixed (`signalk-sailsconfig-*.tgz`)
 - CLAUDE.md git- and npm-ignored
+- Plugin logo, shown in the App Store of the SignalK server (`signalk.appIcon`).
 
 ## [0.9.8]
 - preRelease v1 - aligning test & CI pre-requisites
